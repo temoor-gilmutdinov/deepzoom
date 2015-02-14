@@ -102,14 +102,14 @@ function deepzoom_image_field_formatter_view($obj_type, $object, $field, $instan
 
   $images = array();
   foreach ($items as $item) {
-    $images[md5_file($item['uri'])] = $item['uri'];
+    $images[$item['fid']] = $item['uri'];
   }
 
   if (count($images)) {
     return theme('deepzoom_image', array(
       'images' => $images,
       'image_style' => $settings['deepzoom_image_style'],
-      'processor' => $settings['deepzoom_processor']
+      'processor' => $settings['deepzoom_processor'],
     ));
   }
   return FALSE;
@@ -132,16 +132,15 @@ function theme_deepzoom($variables) {
 function theme_deepzoom_image($variables) {
   $elements = array();
 
-  $images = is_array($variables['images'])
-    ? $variables['images']
-    : array(md5_file($variables['images']) => $variables['images']);
+  $images = is_array($variables['images']) ?
+    $variables['images'] : array(md5_file($variables['images']) => $variables['images']);
   $status = deepzoom_generate_deepzoom($images, $variables['processor']);
 
-  foreach ($images as $md5 => $uri) {
-    if ($status[$uri]) {
+  foreach ($images as $fid => $uri) {
+    if ($status[$fid]) {
       $elements[] = array(
         '#theme' => 'deepzoom_wrapper',
-        '#md5' => $md5,
+        '#md5' => $status[$fid],
       );
     }
 
@@ -162,5 +161,3 @@ function theme_deepzoom_image($variables) {
 
   return $elements;
 }
-
-

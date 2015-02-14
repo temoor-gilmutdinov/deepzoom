@@ -100,6 +100,8 @@ function deepzoom_page_alter($variables) {
 function deepzoom_config($warn = TRUE) {
   $config = &drupal_static(__FUNCTION__, variable_get('deepzoom_config', array()));
 
+  $config['tile_overlap'] = 1;
+
   // Provide default configuraiton if not set.
   if (is_array($config) && empty($config)) {
     $engines = deepzoom_get_engines();
@@ -119,10 +121,10 @@ function deepzoom_config($warn = TRUE) {
       if ($warn) {
         drupal_set_message(t('Deep Zoom is missing an engine, please view the !readme for installation instructions.', array(
           '!readme' => l('README.txt', drupal_get_path('module', 'deepzoom') . '/README.txt'
-        ))), 'error');
+          ))), 'error');
         watchdog('deepzoom', 'Deep Zoom is missing an engine, please view the !readme for installation instructions.', array(
           '!readme' => l('README.txt', drupal_get_path('module', 'deepzoom') . '/README.txt'
-        ), WATCHDOG_ERROR));
+          ), WATCHDOG_ERROR));
       }
       $config = FALSE;
     }
@@ -156,11 +158,12 @@ function deepzoom_generate_deepzoom($images, $method = 'batch') {
 /**
  * Deep Zoom generate image info callback.
  */
-function deepzoom_generate_image_info($uri, $md5) {
+function deepzoom_generate_image_info($md5, $uri = NULL, $image = NULL) {
   $config = deepzoom_config();
-  extract($config);
 
-  $image = image_load($uri);
+  if (!empty($uri)) {
+    $image = image_load($uri);
+  }
   $info = array(
     'md5' => $md5,
     'width' => $image->info['width'],
@@ -177,11 +180,49 @@ function deepzoom_generate_image_info($uri, $md5) {
     $info['levels'][$level]['scale'] = pow(0.5, $info['num_levels'] - $level);
     $info['levels'][$level]['width'] = (int) ceil($info['width'] * $info['levels'][$level]['scale']);
     $info['levels'][$level]['height'] = (int) ceil($image->info['height'] * $info['levels'][$level]['scale']);
-    $info['levels'][$level]['columns'] = (int) ceil(floatval($info['levels'][$level]['width']) / $tile_size);
-    $info['levels'][$level]['rows'] = (int) ceil(floatval($info['levels'][$level]['height']) / $tile_size);
+    $info['levels'][$level]['columns'] = (int) ceil(floatval($info['levels'][$level]['width']) / $config['tile_size']);
+    $info['levels'][$level]['rows'] = (int) ceil(floatval($info['levels'][$level]['height']) / $config['tile_size']);
     $info['levels'][$level]['count'] = $info['levels'][$level]['columns'] * $info['levels'][$level]['rows'];
 
-    $info['count'] += $info['levels'][$level]['columns'] * $info['levels'][$level]['rows'];
+    $info['count'] += $info['levels'][$level]['count'];
+  }
+
+  return $info;
+}
+
+/**
+ * Deep Zoom generate image info callback.
+ */
+function deepzoom_generate_image_info_imagick($md5, $uri = NULL, Imagick $image = NULL) {
+  $config = deepzoom_config();
+
+  if (!empty($uri)) {
+    $image = new Imagick($uri);
+  }
+  $format = $image->getImageFormat();
+  $geometry = $image->getImageGeometry();
+
+  $info = array(
+    'md5' => $md5,
+    'width' => $geometry['width'],
+    'height' => $geometry['height'],
+    'extension' => empty($format) ? 'jpg' : strtolower($format),
+    'max_dimension' => max(array($geometry['width'], $geometry['height'])),
+    'levels' => array(),
+    'count' => 0,
+  );
+  $info['num_levels'] = (int) ceil(log($info['max_dimension'], 2));
+
+  foreach (range(0, $info['num_levels']) as $level) {
+    $info['levels'][$level] = array();
+    $info['levels'][$level]['scale'] = pow(0.5, $info['num_levels'] - $level);
+    $info['levels'][$level]['width'] = (int) ceil($geometry['width'] * $info['levels'][$level]['scale']);
+    $info['levels'][$level]['height'] = (int) ceil($geometry['height'] * $info['levels'][$level]['scale']);
+    $info['levels'][$level]['columns'] = (int) ceil(floatval($info['levels'][$level]['width']) / $config['tile_size']);
+    $info['levels'][$level]['rows'] = (int) ceil(floatval($info['levels'][$level]['height']) / $config['tile_size']);
+    $info['levels'][$level]['count'] = $info['levels'][$level]['columns'] * $info['levels'][$level]['rows'];
+
+    $info['count'] += $info['levels'][$level]['count'];
   }
 
   return $info;
@@ -214,4 +255,40 @@ function deepzoom_invoke($callback, &$vars = array(), $engine = NULL) {
 function template_preprocess_deepzoom_wrapper(&$vars) {
   $vars['classes_array'][] = 'deepzoom';
   $vars['attributes_array']['id'] = "deepzoom-{$vars['md5']}-" . rand(1000, 9999);
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function deepzoom_entity_delete($entity, $type) {
+  if ($type == 'file' && $entity->type == 'image') {
+    $query = db_select('deepzoom', 'dz');
+    $query->condition('fid', $entity->fid);
+    $query->addField('dz', 'md5');
+    $res = $query->execute()->fetchAssoc();
+
+    if (!empty($res['md5'])) {
+      $md5 = $res['md5'];
+
+      $dzi = "public://deepzoom/{$md5}.dzi";
+      $dir = "public://deepzoom/{$md5}_files";
+      if (is_dir($dir)) {
+        $it = new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS);
+        $files = new RecursiveIteratorIterator($it, RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($files as $file) {
+          if ($file->isDir()) {
+            @rmdir($file->getPath() . '/' . $file->getBasename());
+          }
+          else {
+            @unlink($file->getPath() . '/' . $file->getBasename());
+          }
+        }
+      }
+
+      @rmdir($dir);
+      @unlink($dzi);
+
+      db_delete('deepzoom')->condition('fid', $entity->fid)->execute();
+    }
+  }
 }

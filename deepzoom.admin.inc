@@ -9,6 +9,14 @@
 function deepzoom_configuration_form($form, &$form_state) {
   $config = deepzoom_config();
   if ($config) {
+
+    $form['deepzoom_debug_mode'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Debug mode'),
+      '#description' => t('Useful for performance checks of processors'),
+      '#default_value' => variable_get('deepzoom_debug_mode', FALSE),
+    );
+
     $engines = deepzoom_get_engines();
 
     $form['deepzoom_config'] = array(

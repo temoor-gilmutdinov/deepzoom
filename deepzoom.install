@@ -5,6 +5,44 @@
  */
 
 /**
+ * Implements hook_schema().
+ */
+function deepzoom_schema() {
+  $schema = array();
+
+  $schema['deepzoom'] = array(
+    'description' => 'The base table for zoom images, keeps relation between original file and generated presets.',
+    'fields' => array(
+      'md5' => array(
+        'description' => 'MD5 sum for image.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'fid' => array(
+        'description' => 'Image fid.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'unique keys' => array(
+      'md5' => array('md5'),
+      'fid' => array('fid'),
+    ),
+    'foreign keys' => array(
+      'fid' => array(
+        'table' => 'file_managed',
+        'columns' => array('fid' => 'fid'),
+      ),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
  * Implements hook_uninstall().
  */
 function deepzoom_uninstall() {
@@ -46,4 +84,13 @@ function deepzoom_update_7100() {
   }
 
   drupal_flush_all_caches();
+}
+
+/**
+ * Create deepzoom table.
+ */
+function deepzoom_update_7101() {
+  $schema = deepzoom_schema();
+
+  db_create_table('deepzoom', $schema['deepzoom']);
 }

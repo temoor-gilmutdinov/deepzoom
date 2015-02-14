@@ -36,11 +36,17 @@ function deepzoom_deepzoom_engine_info() {
  */
 function deepzoom_deepzoom_processor_info() {
   return array(
-    //'memory' => array(
-    //  'process callback' => 'deepzoom_generate_deepzoom_memory',
-    //),
+    'memory' => array(
+      'process callback' => 'deepzoom_generate_deepzoom_memory',
+      'title' => t('GD memory'),
+    ),
     'batch' => array(
       'process callback' => 'deepzoom_generate_deepzoom_batch',
+      'title' => t('Batch default'),
+    ),
+    'memory_imagick' => array(
+      'process callback' => 'deepzoom_generate_deepzoom_memory_imagick',
+      'title' => t('IMagick memory'),
     ),
   );
 }

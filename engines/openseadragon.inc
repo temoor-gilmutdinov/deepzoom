@@ -28,6 +28,8 @@ function deepzoom_engine_openseadragon_defaults() {
   $defaults = array(
     'tile_size' => 254,
     'tile_overlap' => 1,
+    'max_zoom_ratio' => 1,
+    'min_zoom_ratio' => 1,
   );
   return array_merge($defaults, variable_get('deepzoom_config', $defaults));
 }
@@ -43,10 +45,22 @@ function deepzoom_engine_openseadragon_page_alter($vars) {
   drupal_add_js(drupal_get_path('module', 'deepzoom') . '/engines/deepzoom.openseadragon.js');
 
   $path = str_replace($base_url, '', file_create_url('public://deepzoom'));
-  drupal_add_js(array('deepZoom' => array(
+
+  $global_config = variable_get('deepzoom_config');
+
+  $settings = array(
     'library' => base_path() . $library,
     'path' => $path,
-  )), 'setting');
+  );
+
+  if (!empty($global_config['max_zoom_ratio'])) {
+    $settings['max_zoom_ratio'] = $global_config['max_zoom_ratio'];
+  }
+  if (!empty($global_config['min_zoom_ratio'])) {
+    $settings['min_zoom_ratio'] = $global_config['min_zoom_ratio'];
+  }
+
+  drupal_add_js(array('deepZoom' => $settings), 'setting');
 }
 
 /**
@@ -60,6 +74,20 @@ function deepzoom_engine_openseadragon_settings_form($vars) {
     '#type' => 'textfield',
     '#default_value' => $vars['config']['tile_size'],
     '#description' => t('tile size setting.'),
+  );
+
+  $form['max_zoom_ratio'] = array(
+    '#title' => t('maxZoomPixelRatio'),
+    '#description' => t('Limits maximum zoom in from original image perspective'),
+    '#type' => 'textfield',
+    '#default_value' => $vars['config']['max_zoom_ratio'],
+  );
+
+  $form['min_zoom_ratio'] = array(
+    '#title' => t('minZoomImageRatio'),
+    '#description' => t('Limits maximum zoom out from viewport perspective'),
+    '#type' => 'textfield',
+    '#default_value' => $vars['config']['min_zoom_ratio'],
   );
 
   return $form;

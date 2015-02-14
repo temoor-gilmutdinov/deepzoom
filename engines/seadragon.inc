@@ -287,6 +287,5 @@ function deepzoom_engine_seadragon_submit($vars = array()) {
       $data .= "Seadragon.Config.{$key} = " . drupal_json_encode($value) . ";\r\n";
     }
     file_save_data($data, "{$directory}/deepzoom_config.js", FILE_EXISTS_REPLACE);
-    drupal_flush_all_caches();
   }
 }
